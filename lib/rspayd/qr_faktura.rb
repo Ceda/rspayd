@@ -1,26 +1,25 @@
-# -*- encoding : utf-8 -*-
-
 module Rspayd
   class QrFaktura
+    attr_reader :id, :dd, :am, :tp, :td, :sa, :msg, :on, :vs, :ks, :vii, :ini,
+                :vir, :inr, :duzp, :dppd, :dt, :tb0, :t0, :tb1, :t1, :tb2, :t2,
+                :ntb, :cc, :fx, :fxa, :acc, :crc32, :x_sw, :x_url, :imsg
 
-    attr_reader :id, :dd, :am, :tp, :td, :sa, :msg, :on, :vs, :vii, :ini,
-      :vir, :inr, :duzp, :dppd, :dt, :tb0, :t0, :tb1, :t1, :tb2, :t2,
-      :ntb, :cc, :fx, :fxa, :acc, :crc32, :x_sw, :x_url
-
-    #platba
-    attr_reader :rf, :rn, :pt, :nt, :nta, :x_vs
+    # platba
+    attr_reader :rf, :rn, :pt, :nt, :nta, :x_vs, :x_ks
 
     def initialize(options)
-      options = Hash[options.map{|(k,v)| [k.downcase.to_sym,v]}]
+      options = Hash[options.map { |(k, v)| [k.downcase.to_sym, v] }]
       @id    = options[:id]
       @dd    = options[:dd]
-      @am    = '%.2f' % (options[:am] || options[:amount])
+      @am    = format('%.2f', (options[:am] || options[:amount]))
       @tp    = options[:tp]
       @td    = options[:td]
       @sa    = options[:sa]
+      @imsg  = options[:imsg]
       @msg   = options[:msg]
       @on    = options[:on]
       @vs    = options[:vs]
+      @ks    = options[:ks]
       @vii   = options[:vii]
       @ini   = options[:ini]
       @vir   = options[:vir]
@@ -46,29 +45,32 @@ module Rspayd
 
     def to_qr_invoice
       out = []
-      out << "SID*1.0"
-      [:id, :dd, :tp, :am, :msg, :on, :vs, :vii, :ini,
-        :inr, :vir, :duzp, :dppd, :dt, :tb0, :t0, :tb1, :t1, :tb2, :t2,
-        :ntb, :cc, :fx, :fxa, :td, :sa, :acc, :crc32, :x_sw, :x_url].each{|key|
-          out << "#{key.to_s.upcase.gsub(/_/,'-')}:#{self.send(key)}" unless self.send(key).nil?
-      }
-      out.join('*')+'*'
+      out << 'SID*1.0'
+      %i[id dd tp am msg on vs ks vii ini
+         inr vir duzp dppd dt tb0 t0 tb1 t1 tb2 t2
+         ntb cc fx fxa td sa acc crc32 x_sw x_url].each do |key|
+        out << "#{key.to_s.upcase.gsub(/_/, '-')}:#{send(key)}" unless send(key).nil?
+      end
+      out.join('*') + '*'
     end
 
     def to_qr_payment
       @x_vs = @vs
+      @x_ks = @ks
       out = []
-      out << "SPD*1.0"
-      # TODO :msg, :dt
-      [:am, :x_vs, :dt, :cc, :acc, :rf, :rn, :pt, :crc32, :nt, :nta].each{|key|
-        out << "#{key.to_s.upcase.gsub(/_/,'-')}:#{self.send(key)}" unless self.send(key).nil?
-      }
-      inv = ([:id, :msg, :dd, :tp, :on, :vii, :ini, :inr, :vir, :duzp, :dt, :dppd, :tb0, :t0, :tb1, :t1, :tb2, :t2, :ntb, :fx, :fxa, :td, :sa, :x_sw, :x_url].collect{|key|
-        "#{key.to_s.upcase.gsub(/_/,'-')}:#{self.send(key)}" unless self.send(key).nil?
-      }.compact.join("%2A"))
-      out << "X-INV:SID%2A1.0%2A#{inv}"
-      out.join('*')+'*'
-    end
+      out << 'SPD*1.0'
+      %i[am msg x_vs x_ks dt cc acc rf rn pt crc32 nt nta].each do |key|
+        out << "#{key.to_s.upcase.gsub(/_/, '-')}:#{send(key)}" unless send(key).nil?
+      end
+      inv = %i[id imsg dd tp on vii ini inr vir duzp dt dppd tb0 t0 tb1 t1 tb2 t2 ntb fx fxa td sa x_sw x_url].collect do |key|
+        next if send(key).nil?
 
+        key_name = key == :imsg ? :msg : key
+
+        "#{key_name.to_s.upcase.gsub(/_/, '-')}:#{send(key)}"
+      end.compact.join('%2A')
+      out << "X-INV:SID%2A1.0%2A#{inv}"
+      out.join('*') + '*'
+    end
   end
 end
